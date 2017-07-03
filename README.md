@@ -31,6 +31,7 @@ To run download from git:
 Running is pretty easy:
 
 ```console
+  $ go get golang.org/x/net/websocket
   $ cd go-play/goplay
   $ go run goplay.go
 ```
@@ -38,6 +39,7 @@ Running is pretty easy:
 or if you want to build the binary first:
 
 ```console
+  $ go get golang.org/x/net/websocket
   $ cd go-play/goplay
   $ go build goplay.go
   $ ./goplay

@@ -54,7 +54,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-
 )
 
 /************** FIXME: put in a separate file ****************/
@@ -66,7 +65,8 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-    "code.google.com/p/go.net/websocket"
+
+	"golang.org/x/net/websocket"
 )
 
 type fmtResponse struct {
@@ -90,7 +90,7 @@ func FmtHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		resp.Error =
 			fmt.Sprintf("<pre><a href=\"/error\">%s</a></pre>",
-			err.Error())
+				err.Error())
 	} else {
 		resp.Body = body
 	}
@@ -117,7 +117,7 @@ func gofmt(body string) (string, error) {
 // Ajax POST version of compile+run
 
 type compileResponse struct {
-	Body  string
+	Body   string
 	Stdout string
 	Stderr string
 	Error  string
@@ -134,12 +134,12 @@ func CompileHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	var stderr, stdout []byte
 	var err error
-	runEnv  := strings.Split(req.FormValue("RunEnv"), " ")
+	runEnv := strings.Split(req.FormValue("RunEnv"), " ")
 	runOpts := req.FormValue("RunOpts")
-	srcDir  := req.FormValue("SrcDir")
-	goTest  := req.FormValue("GoTest")
+	srcDir := req.FormValue("SrcDir")
+	goTest := req.FormValue("GoTest")
 
-	if ("true" == goTest) {
+	if "true" == goTest {
 		stdout, stderr, err = runTestViaPost(srcDir, runOpts, runEnv)
 	} else {
 		stdout, stderr, err =
@@ -148,7 +148,7 @@ func CompileHandler(w http.ResponseWriter, req *http.Request) {
 	resp.Stdout = string(stdout)
 	resp.Stderr = string(stderr)
 	if err != nil {
-		resp.Error  = string(err.Error())
+		resp.Error = string(err.Error())
 		fmt.Printf("error is %s\n", resp.Error)
 	}
 	/* fmt.Printf("stdout is %s\n", resp.Stdout)
@@ -192,7 +192,7 @@ func compile(body string, buildOpts string, runOpts string, runEnv []string) (st
 	if err != nil {
 		/* fmt.Printf("+++ stdout is %s\n", stdout)
 		fmt.Printf("+++ stderr is %s\n", stderr) */
-		if (len(stderr) == 0 && len(stdout) != 0) {
+		if len(stderr) == 0 && len(stdout) != 0 {
 			stderr = stdout
 			stdout = []byte("")
 		}
@@ -200,7 +200,7 @@ func compile(body string, buildOpts string, runOpts string, runEnv []string) (st
 	}
 
 	// run x
-	var runStdout, runStderr [] byte
+	var runStdout, runStderr []byte
 	runArgs := []string{bin}
 	if len(runOpts) != 0 {
 		runArgs = append(runArgs, strings.Split(runOpts, " ")...)
@@ -214,7 +214,7 @@ func compile(body string, buildOpts string, runOpts string, runEnv []string) (st
 func runTestViaPost(dir string, runOpts string, runEnv []string) (stdout []byte, stderr []byte, err error) {
 
 	// run x
-	var runStdout, runStderr [] byte
+	var runStdout, runStderr []byte
 	runArgs := []string{"go", "test"}
 	if len(runOpts) != 0 {
 		runArgs = append(runArgs, strings.Split(runOpts, " ")...)
@@ -248,7 +248,6 @@ func run(dir string, env []string, args []string) ([]byte, []byte, error) {
 
 /*********************************************************************************/
 // Now compile+run via websockets
-
 
 // Environ, if non-nil, is used to provide an environment to go command and
 // user binary invocations.
@@ -296,139 +295,139 @@ func WSCompileRunHandler(c *websocket.Conn) {
 	in, out := make(chan *Message), make(chan *Message)
 	errc := make(chan error, 1)
 
-    // Decode messages from client and send to the in channel.
-    go func() {
-        dec := json.NewDecoder(c)
-        for {
-            var m Message
-            if err := dec.Decode(&m); err != nil {
-				fmt.Printf("error in dec.Decode %s\n", err);
-                errc <- err
-                return
-            }
-            in <- &m
-        }
-    }()
+	// Decode messages from client and send to the in channel.
+	go func() {
+		dec := json.NewDecoder(c)
+		for {
+			var m Message
+			if err := dec.Decode(&m); err != nil {
+				fmt.Printf("error in dec.Decode %s\n", err)
+				errc <- err
+				return
+			}
+			in <- &m
+		}
+	}()
 
-    // Receive messages from the out channel and encode to the client.
-    go func() {
-        enc := json.NewEncoder(c)
-        for m := range out {
-            if err := enc.Encode(m); err != nil {
-				fmt.Printf("error in enc.Encode %s\n", err);
-                errc <- err
-                return
-            }
-        }
-    }()
+	// Receive messages from the out channel and encode to the client.
+	go func() {
+		enc := json.NewEncoder(c)
+		for m := range out {
+			if err := enc.Encode(m); err != nil {
+				fmt.Printf("error in enc.Encode %s\n", err)
+				errc <- err
+				return
+			}
+		}
+	}()
 
-   // Start and kill Processes and handle errors.
-    proc := make(map[string]*Process)
-    for {
-        select {
-        case m := <-in:
-            switch m.Kind {
-            case "run":
+	// Start and kill Processes and handle errors.
+	proc := make(map[string]*Process)
+	for {
+		select {
+		case m := <-in:
+			switch m.Kind {
+			case "run":
 				goTest := m.GoTest
-                proc[m.Id].Kill()
+				proc[m.Id].Kill()
 				if goTest {
 					proc[m.Id] = StartTest(m.Id, m.SrcDir, m.RunOpts, nil, out)
 				} else {
 					proc[m.Id] = StartProcess(m.Id, m.Body, m.BuildOpts, m.RunOpts, nil, out)
 				}
-            case "kill":
-                proc[m.Id].Kill()
-            }
-        case err := <-errc:
-            // A encode or decode has failed; bail.
-            log.Println(err)
-            // Shut down any running processes.
-            for _, p := range proc {
-                p.Kill()
-            }
-            return
-        }
-    }
+			case "kill":
+				proc[m.Id].Kill()
+			}
+		case err := <-errc:
+			// A encode or decode has failed; bail.
+			log.Println(err)
+			// Shut down any running processes.
+			for _, p := range proc {
+				p.Kill()
+			}
+			return
+		}
+	}
 }
 
 // Process represents a running process.
 type Process struct {
-    id   string
-    out  chan<- *Message
-    done chan struct{} // closed when wait completes
-    run  *exec.Cmd
+	id   string
+	out  chan<- *Message
+	done chan struct{} // closed when wait completes
+	run  *exec.Cmd
 }
 
 // StartProcess builds and runs the given program, sending its output
 // and end event as Messages on the provided channel.
 func StartProcess(id, body string, buildOpts string, runOpts string, runEnv []string,
 	out chan<- *Message) *Process {
-    p := &Process{
-        id:   id,
-        out:  out,
-        done: make(chan struct{}),
-    }
-    if err := p.start(body, buildOpts, runOpts, runEnv); err != nil {
-        p.end(err)
-        return nil
-    }
-    go p.wait()
-    return p
+	p := &Process{
+		id:   id,
+		out:  out,
+		done: make(chan struct{}),
+	}
+	if err := p.start(body, buildOpts, runOpts, runEnv); err != nil {
+		p.end(err)
+		return nil
+	}
+	go p.wait()
+	return p
 }
 
 // StartProcess builds and runs the given program, sending its output
 // and end event as Messages on the provided channel.
 func StartTest(id, dir string, runOpts string, runEnv []string,
 	out chan<- *Message) *Process {
-    p := &Process{
-        id:   id,
-        out:  out,
-        done: make(chan struct{}),
-    }
-    if err := p.test(dir, runOpts, runEnv); err != nil {
-        p.end(err)
-        return nil
-    }
-    go p.wait()
-    return p
+	p := &Process{
+		id:   id,
+		out:  out,
+		done: make(chan struct{}),
+	}
+	if err := p.test(dir, runOpts, runEnv); err != nil {
+		p.end(err)
+		return nil
+	}
+	go p.wait()
+	return p
 }
 
 // Kill stops the process if it is running and waits for it to exit.
 func (p *Process) Kill() {
-    if p == nil {
-        return
-    }
-    p.run.Process.Kill()
-    <-p.done
+	if p == nil {
+		return
+	}
+	p.run.Process.Kill()
+	<-p.done
 }
 
 // start builds and starts the given program, sends its output to p.out,
 // and stores the running *exec.Cmd in the run field.
 func (p *Process) start(body string, buildOpts string,
-	                    runOpts string, runEnv []string) error {
+	runOpts string, runEnv []string) error {
 	// We "go build" and then exec the binary so that the
 	// resultant *exec.Cmd is a handle to the user's program
 	// (rather than the go tool process).
 	// This makes Kill work.
 
-    // x is the base name for .go and executable files
-    x := filepath.Join(tmpdir, "compile"+strconv.Itoa(<-uniq))
-    src := x + ".go"
-    bin := x
-    if runtime.GOOS == "windows" {
-        bin += ".exe"
-    }
+	// x is the base name for .go and executable files
+	x := filepath.Join(tmpdir, "compile"+strconv.Itoa(<-uniq))
+	src := x + ".go"
+	bin := x
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 
-    // write body to x.go
-    defer os.Remove(src)
-    if err := ioutil.WriteFile(src, []byte(body), 0666); err != nil {
-        return err
-    }
+	// write body to x.go
+	defer os.Remove(src)
+	if err := ioutil.WriteFile(src, []byte(body), 0666); err != nil {
+		return err
+	}
 
-    // build x.go, creating x
-    defer os.Remove(bin)
-    dir, file := filepath.Split(src)
-    var cmd  *exec.Cmd
+	// build x.go, creating x
+	defer os.Remove(bin)
+	dir, file := filepath.Split(src)
+	var cmd *exec.Cmd
 	buildArgs := []string{"go", "build", "-o", bin}
 	if len(buildOpts) != 0 {
 		buildArgs = append(buildArgs, strings.Split(buildOpts, " ")...)
@@ -437,63 +436,63 @@ func (p *Process) start(body string, buildOpts string,
 	cmd = p.cmd(dir, nil, buildArgs...)
 	// fmt.Println("++cmd", cmd);
 	cmd.Stdout = cmd.Stderr // send compiler output to stderr
-    if err := cmd.Run(); err != nil {
-        return err
-    }
+	if err := cmd.Run(); err != nil {
+		return err
+	}
 
-    // run x
+	// run x
 	runArgs := []string{bin}
 	if len(runOpts) != 0 {
 		runArgs = append(runArgs, strings.Split(runOpts, " ")...)
 	}
-    cmd = p.cmd("", runEnv, runArgs...)
-    if err := cmd.Start(); err != nil {
-        return err
-    }
+	cmd = p.cmd("", runEnv, runArgs...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
 
-    p.run = cmd
-    return nil
+	p.run = cmd
+	return nil
 }
 
 // Run go test on given directory, sends its output to p.out,
 // and stores the running *exec.Cmd in the run field.
 func (p *Process) test(dir string, runOpts string, runEnv []string) error {
-    // run go test
+	// run go test
 	runArgs := []string{"go", "test"}
 	if len(runOpts) != 0 {
 		runArgs = append(runArgs, strings.Split(runOpts, " ")...)
 	}
-    cmd := p.cmd(dir, runEnv, runArgs...)
-    if err := cmd.Start(); err != nil {
-        return err
-    }
+	cmd := p.cmd(dir, runEnv, runArgs...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
 
-    p.run = cmd
-    return nil
+	p.run = cmd
+	return nil
 }
 
 // wait waits for the running process to complete
 // and sends its error state to the client.
 func (p *Process) wait() {
-    p.end(p.run.Wait())
+	p.end(p.run.Wait())
 	close(p.done) // unblock waiting Kill calls
 }
 
 // end sends an "end" message to the client, containing the process id and the
 // given error value.
 func (p *Process) end(err error) {
-    m := &Message{Id: p.id, Kind: "end"}
-    if err != nil {
-        m.Body = err.Error()
-    }
-    p.out <- m
+	m := &Message{Id: p.id, Kind: "end"}
+	if err != nil {
+		m.Body = err.Error()
+	}
+	p.out <- m
 }
 
 // cmd builds an *exec.Cmd that writes its standard output and error to the
 // Process' output channel.
 func (p *Process) cmd(dir string, env []string, args ...string) *exec.Cmd {
-    cmd := exec.Command(args[0], args[1:]...)
-    cmd.Dir = dir
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = dir
 	if env != nil && len(env) != 0 {
 		cmd.Env = env
 	} else if Environ != nil {
@@ -506,27 +505,27 @@ func (p *Process) cmd(dir string, env []string, args ...string) *exec.Cmd {
 	s = fmt.Sprintf("GOROOT=%s", os.Getenv("GOROOT"))
 	cmd.Env = append(cmd.Env, s)
 
-    cmd.Stdout = &messageWriter{p.id, "stdout", p.out}
-    cmd.Stderr = &messageWriter{p.id, "stderr", p.out}
-    return cmd
+	cmd.Stdout = &messageWriter{p.id, "stdout", p.out}
+	cmd.Stderr = &messageWriter{p.id, "stderr", p.out}
+	return cmd
 }
 
 // messageWriter is an io.Writer that converts all writes to Message sends on
 // the out channel with the specified id and kind.
 type messageWriter struct {
-    id, kind string
-    out      chan<- *Message
+	id, kind string
+	out      chan<- *Message
 }
 
 func (w *messageWriter) Write(b []byte) (n int, err error) {
-    w.out <- &Message{Id: w.id, Kind: w.kind, Body: string(b)}
-    return len(b), nil
+	w.out <- &Message{Id: w.id, Kind: w.kind, Body: string(b)}
+	return len(b), nil
 }
 
 /*********************************************************************************/
 
 const DefaultSaveName = "save"
-const GoPathSuffix    = ".go"
+const GoPathSuffix = ".go"
 
 // SaveHandler writes a Go program to file.
 //
@@ -542,9 +541,9 @@ func SaveHandler(w http.ResponseWriter, req *http.Request) {
 	// +3 for enclosing "/X", e.g. "/save/X" not "save"
 	SaveLen := len(DefaultSaveName) + 3
 	if len(req.URL.Path) > SaveLen {
-		filename = req.URL.Path[SaveLen:];
+		filename = req.URL.Path[SaveLen:]
 		if filename[0] != '/' {
-			filename = filepath.Join(tmpdir, filename);
+			filename = filepath.Join(tmpdir, filename)
 		}
 	}
 	if req.Method != "POST" {
@@ -578,7 +577,7 @@ func SaveHandler(w http.ResponseWriter, req *http.Request) {
 /*******************/
 
 func ShareHandler(w http.ResponseWriter, req *http.Request) {
-	fmt.Printf("Redirecting\n");
+	fmt.Printf("Redirecting\n")
 	http.Redirect(w, req, "http://play.golang.org/share", http.StatusFound)
 }
 
@@ -587,8 +586,8 @@ func ShareHandler(w http.ResponseWriter, req *http.Request) {
 var (
 	httpListen = flag.String("http", "127.0.0.1:3998",
 		"host:port to listen on")
-	htmlOutput = flag.Bool("html", false, "render program output as HTML")
-	resourceDir = "../static"
+	htmlOutput   = flag.Bool("html", false, "render program output as HTML")
+	resourceDir  = "../static"
 	resourceDirP = &resourceDir
 	// resourceDir = flag.String("resource-root", "../static",
 	// 	"Location of CSS and JavaScript resources")
@@ -611,11 +610,11 @@ func main() {
 		log.Fatal(err)
 	}
 	http.HandleFunc("/", edit)
-	http.HandleFunc("/compile",   CompileHandler)
-	http.HandleFunc("/fmt",       FmtHandler)
-	http.HandleFunc("/save",      SaveHandler)
-	http.HandleFunc("/share",     ShareHandler)
-	http.HandleFunc("/save/",     SaveHandler)
+	http.HandleFunc("/compile", CompileHandler)
+	http.HandleFunc("/fmt", FmtHandler)
+	http.HandleFunc("/save", SaveHandler)
+	http.HandleFunc("/share", ShareHandler)
+	http.HandleFunc("/save/", SaveHandler)
 	http.Handle("/wscompile", websocket.Handler(WSCompileRunHandler))
 
 	http.Handle("/static/", http.StripPrefix("/static/",
@@ -624,7 +623,6 @@ func main() {
 		*httpListen)
 	log.Fatal(http.ListenAndServe(*httpListen, nil))
 }
-
 
 // Default program to start out with.
 const hello = `package main
@@ -635,6 +633,7 @@ func main() {
 	fmt.Println("hello, world")
 }
 `
+
 var editTemplate = template.Must(template.ParseFiles("goplay.html"))
 
 type Snippet struct {
@@ -642,7 +641,7 @@ type Snippet struct {
 }
 
 type editData struct {
-	Snippet *Snippet
+	Snippet     *Snippet
 	ResourceDir string
 }
 
